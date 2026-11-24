@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CertChain BPDC · Verify a certificate</title>
+<meta name="description" content="Verify a club or department certificate in seconds. Records live on the Base Sepolia blockchain.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%E2%9C%85%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="logo">✓</div>
+    <div><h1>CertChain</h1><p>Tamper-proof club &amp; department certificates · Base Sepolia testnet</p></div>
+  </div>
+  <div id="netBadge" class="badge">Loading…</div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button class="tab active" data-tab="verify" role="tab">🔍 Verify</button>
+  <button class="tab" data-tab="issuer" role="tab">🏷️ Issuer</button>
+  <button class="tab" data-tab="admin" role="tab">🛡️ Admin</button>
+</nav>
+
+<main>
+  <div id="noContract" class="banner warn hidden">
+    No contract connected yet. Go to the <b>Admin</b> tab and press <b>Deploy contract</b>, or open this page with <code>?contract=0x…</code>.
+  </div>
+
+  <!-- ============ VERIFY (public, no wallet) ============ -->
+  <section id="tab-verify" class="panel">
+    <div class="card">
+      <h2>Verify a certificate</h2>
+      <p class="muted">Type the certificate code printed on the certificate (for example <b>C-1042</b>). No wallet or login needed.</p>
+      <form id="verifyForm" class="row">
+        <input id="verifyCode" placeholder="Certificate code, e.g. C-1042" autocomplete="off" autocapitalize="characters" required>
+        <button class="primary" type="submit">Verify</button>
+      </form>
+    </div>
+    <div id="verifyResult"></div>
+  </section>
+
+  <!-- ============ ISSUER ============ -->
+  <section id="tab-issuer" class="panel hidden">
+    <div class="card">
+      <h2>Issuer desk</h2>
+      <p class="muted">For clubs and departments that the admin has approved. Connect the club's MetaMask wallet.</p>
+      <div class="walletBox">
+        <button class="primary connectBtn">Connect MetaMask</button>
+        <div class="walletInfo muted"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>1 · Issue a new certificate</h3>
+      <form id="issueForm" class="stack">
+        <label>Certificate code <input name="code" placeholder="C-1042" required></label>
+        <label>Holder ID <small>(fake ID like S-001 or a hash — never a real name)</small><input name="holderId" placeholder="S-001" required></label>
+        <label>Title <input name="title" placeholder="Intro to Solidity Workshop – Participant" required></label>
+        <button class="primary" type="submit">Issue certificate</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>2 · Correct a certificate</h3>
+      <p class="muted small">Adds a new version. The old version stays visible forever. Only the wallet that issued it can do this.</p>
+      <form id="correctForm" class="stack">
+        <label>Certificate code <input name="code" placeholder="C-1042" required></label>
+        <label>Corrected title <input name="title" placeholder="Intro to Solidity Workshop – Winner" required></label>
+        <label>Reason <input name="reason" placeholder="Wrong award typed" required></label>
+        <button class="primary" type="submit">Post correction</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>3 · Revoke a certificate</h3>
+      <p class="muted small">Adds a final “revoked” version. Nothing is deleted.</p>
+      <form id="revokeForm" class="stack">
+        <label>Certificate code <input name="code" placeholder="C-1042" required></label>
+        <label>Reason <input name="reason" placeholder="Issued by mistake" required></label>
+        <button class="danger" type="submit">Revoke certificate</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <label class="check"><input type="checkbox" id="forceSend"> Demo mode: send the transaction even if the contract will refuse it (records a <b>failed</b> transaction on Basescan as proof). Costs a tiny bit of test ETH.</label>
+    </div>
+  </section>
+
+  <!-- ============ ADMIN ============ -->
+  <section id="tab-admin" class="panel hidden">
+    <div class="card">
+      <h2>Admin (Student Affairs office)</h2>
+      <p class="muted">The admin decides which club or department wallets may issue certificates.</p>
+      <div class="walletBox">
+        <button class="primary connectBtn">Connect MetaMask</button>
+        <div class="walletInfo muted"></div>
+      </div>
+      <div id="adminInfo" class="small muted"></div>
+    </div>
+
+    <div class="card">
+      <h3>Add an issuer</h3>
+      <form id="addIssuerForm" class="stack">
+        <label>Wallet address <input name="addr" placeholder="0x…" required></label>
+        <label>Display name <input name="name" placeholder="Coding Club" required></label>
+        <button class="primary" type="submit">Add issuer</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Remove an issuer</h3>
+      <p class="muted small">Their old certificates stay valid and visible; they just can't post new ones.</p>
+      <form id="removeIssuerForm" class="row">
+        <input name="addr" placeholder="0x…" required>
+        <button class="danger" type="submit">Remove</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Issuers (live from the contract)</h3>
+      <div id="issuerList" class="muted">—</div>
+    </div>
+
+    <div class="card" id="deployCard">
+      <h3>Deploy contract</h3>
+      <p class="muted small">Deploys <code>CertificateRegistry</code> to Base Sepolia from your MetaMask wallet. The wallet that deploys becomes the <b>admin</b>. Needs a little Base Sepolia test ETH (<a id="faucetLink" target="_blank" rel="noopener">faucet</a>).</p>
+      <button id="deployBtn" class="primary">Deploy contract</button>
+      <div id="deployOut"></div>
+    </div>
+  </section>
+
+  <!-- transaction log -->
+  <section class="card" id="txCard">
+    <h3>Your transactions (this browser)</h3>
+    <p class="muted small">Copy these hashes for the submission form.</p>
+    <div id="txLog" class="muted small">None yet.</div>
+  </section>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+
+<footer>
+  Contract: <span id="contractLabel">—</span> · Fake data only (IDs like S-001) · HASH-IT-OUT 2026, Track 1 · by Rakshit Sanghi
+</footer>
+
+<script src="vendor/ethers.umd.min.js"></script>
+<script src="config.js"></script>
+<script src="contract-artifact.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

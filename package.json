@@ -1,0 +1,18 @@
+{
+  "name": "hashitout-certificate-registry",
+  "version": "1.0.0",
+  "description": "Blockchain certificate issuing and verification on Base Sepolia (HASH-IT-OUT 2026, Track 1)",
+  "scripts": {
+    "compile": "node compile.js",
+    "test": "node compile.js && node test/test.js",
+    "start": "npx --yes serve docs"
+  },
+  "author": "Rakshit Sanghi",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "ethers": "^6.17.0",
+    "ganache": "^7.9.2",
+    "solc": "0.8.24"
+  }
+}
