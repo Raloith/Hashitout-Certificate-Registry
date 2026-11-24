@@ -1,6 +1,12 @@
 # CertChain: one-page note (HASH-IT-OUT 2026, Track 1)
 
-**Team:** Rakshit Sanghi (solo). **Network:** Base Sepolia. **Contract:** `0x…` · **Repo:** `https://github.com/Raloith/hashitout-certificate-registry`
+**Team:** Rakshit Sanghi (solo): contract, frontend, deployment. **Network:** Base Sepolia (chain 84532).
+
+* **Live app:** https://raloith.github.io/Hashitout-Certificate-Registry/
+* **Repo:** https://github.com/Raloith/Hashitout-Certificate-Registry
+* **Contract:** [0x5256Ac6F543aFFd4E7a402ee2D8D0e7965441B0f](https://sepolia.basescan.org/address/0x5256Ac6F543aFFd4E7a402ee2D8D0e7965441B0f)
+* **Tx 1, issue C-1042:** https://sepolia.basescan.org/tx/0xa0e3b8598ca62a086025543a7fcb7d27d2773c16e1110b8d7cbc589eb170b88b
+* **Tx 2, correct C-1042:** https://sepolia.basescan.org/tx/0xeeaee8052b7de43a7e3a0a5b32f75a39a3a00ea7bb06d47e979a60c59acce624
 
 ### 1. The user and their one task
 An **internship recruiter** gets a CV from a BPDC student that lists "C-1042: Intro to Solidity Workshop – Participant (BPDC Coding Club)". In seconds, with no wallet or login, they type the code into CertChain and see whether it is **Valid, Valid (corrected), Revoked or Not found**, who issued it, and its full history. The **issuers** are BPDC clubs and departments, approved by the **admin** (the Student Affairs office). Their one task is to issue, or fix, a certificate without anyone being able to fake one.
@@ -29,7 +35,7 @@ An **internship recruiter** gets a CV from a BPDC student that lists "C-1042: In
 * There is no function to edit or delete anything. A correction is always a new version.
 
 ### 5. How to run it
-1. Open the live site (GitHub Pages link in the repo README).
+1. Open https://raloith.github.io/Hashitout-Certificate-Registry/
 2. **Verify tab:** type a code like **C-1042** and press Verify. No wallet needed.
 3. **Issuer and Admin tabs:** press Connect MetaMask. The site switches to Base Sepolia by itself.
 4. To try a refusal, connect any wallet that isn't an issuer and press Issue.

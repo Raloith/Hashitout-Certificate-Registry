@@ -1,36 +1,53 @@
 # CertChain: tamper-proof certificates for BPDC clubs and departments
 
 **HASH-IT-OUT 2026, Track 1 (Digital Identity): Blockchain-Based Certificate Verification System**
-Built by **Rakshit Sanghi** (solo): contract, frontend, deployment.
 
-> **Live demo:** `https://raloith.github.io/Hashitout-Certificate-Registry/?contract=0x7de80312BcDd9FBA204B0C95eb751Fbb8D8001f5` (GitHub Pages)
-> **Contract (Base Sepolia):** `0x7de80312BcDd9FBA204B0C95eb751Fbb8D8001f5` ← paste after deploying
-> **Network:** Base Sepolia testnet (chain ID 84532). **Fake data only** (holder IDs like `S-001`).
+## Deliverables
+
+| Item | Link |
+|---|---|
+| **Live app** | https://raloith.github.io/Hashitout-Certificate-Registry/ |
+| **Repository** | https://github.com/Raloith/Hashitout-Certificate-Registry |
+| **Contract (Base Sepolia, chain 84532)** | [`0x5256Ac6F543aFFd4E7a402ee2D8D0e7965441B0f`](https://sepolia.basescan.org/address/0x5256Ac6F543aFFd4E7a402ee2D8D0e7965441B0f) |
+| **Proof tx 1: issue C-1042** | [`0xa0e3b8598ca62a086025543a7fcb7d27d2773c16e1110b8d7cbc589eb170b88b`](https://sepolia.basescan.org/tx/0xa0e3b8598ca62a086025543a7fcb7d27d2773c16e1110b8d7cbc589eb170b88b) |
+| **Proof tx 2: correct C-1042 (new version)** | [`0xeeaee8052b7de43a7e3a0a5b32f75a39a3a00ea7bb06d47e979a60c59acce624`](https://sepolia.basescan.org/tx/0xeeaee8052b7de43a7e3a0a5b32f75a39a3a00ea7bb06d47e979a60c59acce624) |
+| **One-page note** | [NOTE.md](NOTE.md) |
+| **Who did what** | Rakshit Sanghi: contract, frontend, deployment |
+
+Try it: open the live app, type **C-1042** and press **Verify**. The result is **✔ Valid (corrected)**, with the full version history.
+[Direct link](https://raloith.github.io/Hashitout-Certificate-Registry/?code=C-1042)
 
 ---
 
 ## What it is
 
-A club or department at BPDC issues a certificate for an event or workshop, for example
-**C-1042: "Intro to Solidity Workshop – Participant", holder S-001**. The certificate is written to a
-smart contract on the Base Sepolia blockchain.
+A BPDC club or department issues a certificate for an event or workshop, for example
+**C-1042: "Intro to Solidity Workshop", holder S-001**. The certificate is written to a smart contract on the Base Sepolia blockchain.
 
-Later, an internship recruiter types **C-1042** into the website. In a few seconds they see
-**✔ Valid**, **✔ Valid (corrected)**, **⛔ Revoked** or **✖ Not found**, plus who issued it and its
-full history. The recruiter needs no wallet, no login, and doesn't have to trust anybody.
+An internship recruiter types **C-1042** into the website. In a few seconds they see **✔ Valid**, **✔ Valid (corrected)**,
+**⛔ Revoked** or **✖ Not found**, plus who issued it and its full history. They need no wallet and no login, and they don't have to trust anyone.
 
-**Why not just a shared spreadsheet?** Anyone with edit access can quietly change a spreadsheet,
-and a recruiter has to trust whoever owns it. Here, only approved issuer wallets can post. A
-correction is a *new version*, and the old one stays visible forever. Anyone can check the record
-directly on the public chain.
+**Why not a shared spreadsheet?** Anyone with edit access can quietly change a spreadsheet, and the reader has to trust its owner.
+Here, only approved issuer wallets can post. A correction is a *new version*, and the old one stays visible forever. Anyone can check
+the record directly on the public chain.
 
 ## The three roles
 
-| Role | Who (story) | What they can do | Enforced by |
+| Role | Who | What they can do | Enforced by |
 |---|---|---|---|
-| **Admin** | Student Affairs office (the wallet that deployed the contract) | Add or remove issuer wallets | `onlyAdmin` in the contract |
-| **Issuer** | A club or department wallet (e.g. "BPDC Coding Club") | Issue, correct and revoke **its own** certificates | `onlyIssuer` + "original issuer" check |
-| **Public** | A recruiter, a university, anyone | Verify a code. No wallet needed. | Free `view` functions |
+| **Admin** | Student Affairs office (the deploying wallet) | Add or remove issuer wallets | `onlyAdmin` |
+| **Issuer** | A club or department wallet (e.g. "BPDC Coding Club") | Issue, correct and revoke **its own** certificates | `onlyIssuer` + original-issuer check |
+| **Public** | A recruiter, a university, anyone | Verify a code with no wallet | Free `view` functions |
+
+## What the contract refuses
+
+* **"Only an authorized issuer can post":** a wallet that isn't an approved issuer tries to issue, correct or revoke.
+* **"Only the admin can manage issuers":** anyone but the admin tries to add or remove an issuer.
+* **"Certificate code already exists":** someone tries to issue a code twice.
+* **"Certificate not found":** someone tries to correct or revoke a code that was never issued.
+* **"Only the original issuer can correct this":** a different club tries to change another club's certificate.
+* **"Certificate is revoked":** someone tries to post anything after a revoke.
+* There's no edit or delete function. Every change is appended as a new version.
 
 ## Architecture
 
@@ -45,69 +62,50 @@ directly on the public chain.
                                              admin · isIssuer · issuerName · versions[code][]
 ```
 
-* **Smart contract:** `contracts/CertificateRegistry.sol` (Solidity, ~150 lines, every part commented).
-  * Each certificate code maps to a **list of versions**. `issue` creates version 0. `correct` and `revoke`
-    **append** new versions. There is no edit or delete function at all.
-  * Each version stores the holder ID (fake ID or hash), title, reason, issuer wallet, status,
-    timestamp and block number.
-  * Events (`CertificateIssued`, `CertificateCorrected`, `CertificateRevoked`, `IssuerAdded`, `IssuerRemoved`)
-    show up on Basescan.
-* **Website:** `docs/` is plain HTML, CSS and JavaScript using **ethers.js v6** (bundled in `docs/vendor/`, so no build step).
+* **Smart contract:** `contracts/CertificateRegistry.sol`, Solidity 0.8.24, fully commented.
+  * Each certificate code maps to a **list of versions**. `issue` creates version 0, and `correct` and `revoke` append new ones.
+  * Each version stores the holder ID (fake ID or hash), title, reason, issuer wallet, status, timestamp and block number.
+  * Events are emitted for every action and are visible on Basescan.
+* **Website:** `docs/` is plain HTML, CSS and JavaScript with **ethers.js v6** (bundled in `docs/vendor/`, so there's no build step), served by GitHub Pages.
   * `config.js` holds the contract address and network settings.
-  * `contract-artifact.js` holds the compiled ABI and bytecode (generated by `compile.js`).
+  * `contract-artifact.js` holds the compiled ABI and bytecode.
   * `app.js` contains all the logic:
     * Reading through the public RPC.
     * Connecting MetaMask and auto-switching or adding Base Sepolia.
     * Sending transactions.
-    * Decoding refusals into friendly messages ("Refused by the contract: Only an authorized issuer can post").
-    * Finding each version's transaction hash. It asks the node for this contract's logs in the version's block.
-    * A **Deploy contract** button that deploys the compiled bytecode straight from MetaMask.
-* **Tests:** `test/test.js` deploys the contract to a local in-memory Ganache chain and checks every rule and refusal (15 checks).
+    * Decoding contract refusals into friendly messages ("Refused by the contract: …").
+    * Linking each version to its transaction. It looks up this contract's log for that code in the version's block.
+* **Tests:** `test/test.js` deploys to a local Ganache chain and checks every rule and refusal (15 checks).
 
-### What lives where
+### On the blockchain vs. only on the page
+* **On the blockchain:** the admin, the issuer wallets and their names, and every certificate version.
+* **Only on the page:** the Valid / Corrected / Revoked / Not found verdict, which is worked out from the latest version. Also the formatted dates, explorer links, the issuer list view and friendly error text.
 
-* **On the blockchain:** issuer wallets and their names, and every certificate version (holder ID, title, reason, issuer, status, time). Nothing else.
-* **Only on the page:** the big Valid / Corrected / Revoked / Not found verdict, which is worked out from the latest version and the number of versions. Also the formatted dates, Basescan links, the issuer list view, friendly error text, and your local list of transaction hashes.
+## Run locally
 
-## How to run it
-
-### Option A: use the live site
-1. Open the GitHub Pages link above. If the contract isn't in `config.js` yet, add `?contract=0xYourAddress` to the URL.
-2. **Verify** works immediately, with no wallet.
-3. For **Issuer** and **Admin**, install MetaMask, press **Connect MetaMask**, and approve the switch to Base Sepolia.
-
-### Option B: run locally
 ```bash
-npm install          # solc, ethers, ganache (dev tools only)
-npm test             # compiles the contract + runs the 15 local checks
-npx serve docs       # or: cd docs && python3 -m http.server 8080
-# open http://localhost:8080   (MetaMask does not work on file:// pages, so use a local server)
+npm install      # solc, ethers, ganache (dev tools only)
+npm test         # compile the contract + run the 15 local checks
+npx serve docs   # or: cd docs && python3 -m http.server 8080, then open http://localhost:8080
 ```
-
-### Deploying the contract
-* **Easiest:** open the site, go to **Admin**, connect MetaMask (on Base Sepolia, with a little test ETH), and press **Deploy contract**.
-  The page shows the new address. Paste it into `docs/config.js` → `CONTRACT_ADDRESS`, then commit.
-* **Backup: Remix**
-  1. Open remix.ethereum.org, create `CertificateRegistry.sol`, and paste the contract.
-  2. Compile it with 0.8.24 (any 0.8.20+ works).
-  3. Under Deploy, set Environment to **Injected Provider – MetaMask** (Base Sepolia), then press **Deploy**.
-  4. Copy the address into `config.js`.
-
-See **DEMO.md** for the full step-by-step and pitch script, **NOTE.md** for the one-page note and
-**EXPLAIN.md** for a line-by-line explanation of the contract.
+MetaMask doesn't work on `file://` pages, so use a local server. To point the site at another deployment, set
+`CONTRACT_ADDRESS` in `docs/config.js` or add `?contract=0x…` to the URL. The contract can also be deployed from Remix
+(compile 0.8.24 → Injected Provider – MetaMask → Deploy).
 
 ## Files
 ```
 contracts/CertificateRegistry.sol   the smart contract
 compile.js                          compiles it with solc → artifacts/ + docs/contract-artifact.js
-test/test.js                        local tests on Ganache (every refusal)
-docs/                               the website (GitHub Pages serves this folder)
-NOTE.md  DEMO.md  EXPLAIN.md         submission note, demo script, contract walkthrough
+test/test.js                        local tests (every refusal)
+docs/                               the website (served by GitHub Pages)
+NOTE.md                             one-page note
+EXPLAIN.md                          line-by-line contract walkthrough
+DEMO.md                             demo script and Q&A
 ```
+
+## Privacy and safety
+This runs on testnet only, with fake data only (IDs like S-001) and no real money. In a real deployment, `holderId` would be a salted hash of the
+student ID, and names would stay in the university's own system, never on a public chain.
 
 ## Who did what
 * **Rakshit Sanghi:** contract, frontend, deployment.
-
-## Safety
-Testnet only, fake data only, no real money. No personal data on-chain: in a real deployment, `holderId`
-would be a salted hash of the student ID, and names would stay in the university's own system.

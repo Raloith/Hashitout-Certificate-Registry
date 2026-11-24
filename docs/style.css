@@ -53,5 +53,6 @@ code,.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.92em;wor
 .txrow button{padding:4px 10px;font-size:12px}
 .issuerRow{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap;color:var(--ink)}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;max-width:92vw;z-index:9;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+summary{cursor:pointer}
 footer{text-align:center;font-size:12px;color:var(--muted);padding:20px 12px 30px}
 @media (max-width:560px){.facts{grid-template-columns:1fr}.facts dt{margin-top:6px}.result .big{font-size:24px}.tab{font-size:13px;padding:10px 4px}.brand p{display:none}}

@@ -45,7 +45,7 @@
     // Try decoding Error(string) revert data (selector 0x08c379a0) if present anywhere
     const m = blob.match(/0x08c379a0[0-9a-fA-F]+/);
     if (m) { try { return 'Refused by the contract: ' + ethers.AbiCoder.defaultAbiCoder().decode(['string'], '0x' + m[0].slice(10))[0]; } catch {} }
-    if (/insufficient funds/i.test(blob)) return 'Your wallet needs a little Base Sepolia test ETH. Get some free from the faucet.';
+    if (/insufficient funds/i.test(blob)) return 'Your wallet needs a little Base Sepolia test ETH to pay the network fee.';
     if (e?.reason) return 'Refused by the contract: ' + e.reason;
     if (/could not decode result data|BAD_DATA/i.test(blob)) return 'No CertChain contract found at this address on ' + CFG.CHAIN_NAME + '. Check the contract address.';
     if (/network|fetch|timeout/i.test(blob)) return 'Could not reach the blockchain. Check your internet and try again.';
@@ -64,7 +64,8 @@
     $('#noContract').classList.toggle('hidden', has);
     $('#contractLabel').innerHTML = has ? addrLink(contractAddress) : 'not set';
     $('#netBadge').textContent = (CHAIN_ID === 84532 ? CFG.CHAIN_NAME : 'Chain ' + CHAIN_ID) + (has ? ' · live' : ' · no contract');
-    $('#faucetLink').href = CFG.FAUCET;
+    // The setup card is only shown when no registry is configured (or with ?admin-deploy=1).
+    $('#deployCard').classList.toggle('hidden', has && params.get('admin-deploy') !== '1');
   }
 
   // ---------- VERIFY ----------
@@ -82,7 +83,7 @@
     const out = $('#verifyResult');
     const code = normCode(codeRaw);
     if (!code) return;
-    if (!ethers.isAddress(contractAddress)) { out.innerHTML = `<div class="banner warn">No contract connected yet.</div>`; return; }
+    if (!ethers.isAddress(contractAddress)) { out.innerHTML = `<div class="banner warn">This site is not connected to a certificate registry right now.</div>`; return; }
     out.innerHTML = `<div class="card muted">Checking <b>${esc(code)}</b> on the blockchain…</div>`;
     try {
       const c = readContract();
@@ -199,7 +200,8 @@
   }
   function renderTxLog() {
     const list = JSON.parse(localStorage.getItem('certchain.txs') || '[]');
-    if (!list.length) { $('#txLog').textContent = 'None yet.'; return; }
+    $('#txCard').classList.toggle('hidden', !list.length);
+    if (!list.length) return;
     $('#txLog').innerHTML = list.map(t => `<div class="txrow"><span>${t.ok ? '✅' : '⛔'} <b>${esc(t.label)}</b> · ${txLink(t.hash)}</span>
       <button data-copy="${t.hash}">Copy hash</button></div>`).join('');
   }
@@ -210,7 +212,7 @@
 
   // Runs one contract write: makes sure wallet + network are ready, sends, waits, reports.
   async function send(label, method, args, btn) {
-    if (!ethers.isAddress(contractAddress)) { toast('No contract connected yet — deploy it in the Admin tab first.'); return false; }
+    if (!ethers.isAddress(contractAddress)) { toast('This site is not connected to a certificate registry right now.'); return false; }
     if (!signer && !(await connect())) return false;
     await ensureChain().catch(() => {});
     const c = new ethers.Contract(contractAddress, ART.abi, signer);
@@ -271,8 +273,8 @@
 
   async function refreshAdmin() {
     const has = ethers.isAddress(contractAddress);
-    $('#deployBtn').textContent = has ? 'Deploy a new (separate) contract' : 'Deploy contract';
-    if (!has) { $('#adminInfo').textContent = 'No contract yet — deploy one below.'; $('#issuerList').textContent = '—'; $('#deployCard').scrollIntoView?.({ block: 'nearest' }); return; }
+    $('#deployBtn').textContent = has ? 'Create a new (separate) registry' : 'Create registry';
+    if (!has) { $('#adminInfo').textContent = 'No registry connected.'; $('#issuerList').textContent = '—'; $('#deployCard').scrollIntoView?.({ block: 'nearest' }); return; }
     try {
       const c = readContract();
       const [adm, n] = await Promise.all([c.admin(), c.issuerCount()]);
@@ -281,32 +283,32 @@
       const rows = await Promise.all(addrs.map(async a => ({ a, name: await c.issuerName(a), on: await c.isIssuer(a) })));
       $('#issuerList').innerHTML = rows.length ? rows.map(r => `<div class="issuerRow"><span><b>${esc(r.name)}</b> · ${addrLink(r.a)}</span>
         <span>${r.on ? `<span class="pill on">active</span> <button class="small" data-remove="${r.a}">Remove…</button>` : '<span class="pill off">removed</span>'}</span></div>`).join('')
-        : 'No issuers yet. Add your club wallet above (you can add your own wallet too).';
+        : 'No issuers yet.';
     } catch (e) { $('#issuerList').innerHTML = `<span class="banner bad">${esc(friendlyError(e))}</span>`; }
   }
 
   // Deploy straight from the browser with MetaMask (no Remix needed).
   $('#deployBtn').addEventListener('click', async ev => {
     const btn = ev.currentTarget;
-    if (ethers.isAddress(contractAddress) && !confirm('A contract is already connected. Deploy a brand-new empty one?')) return;
+    if (ethers.isAddress(contractAddress) && !confirm('A registry is already connected. Create a brand-new empty one?')) return;
     if (!signer && !(await connect())) return;
     btn.disabled = true; const old = btn.textContent; btn.textContent = 'Confirm in MetaMask…';
     try {
       await ensureChain();
       const factory = new ethers.ContractFactory(ART.abi, ART.bytecode, signer);
       const c = await factory.deploy();
-      btn.textContent = 'Deploying…';
+      btn.textContent = 'Creating…';
       await c.waitForDeployment();
       contractAddress = await c.getAddress();
       localStorage.setItem('certchain.contract.' + CHAIN_ID, contractAddress);
-      logTx('Deploy CertificateRegistry', c.deploymentTransaction().hash, true);
+      logTx('Create registry', c.deploymentTransaction().hash, true);
       const share = location.origin + location.pathname + '?contract=' + contractAddress;
-      $('#deployOut').innerHTML = `<div class="banner ok">✅ Deployed! Contract address:<br><b class="mono">${contractAddress}</b><br>
-        Share link: <a href="${share}">${esc(share)}</a><br>Next: paste the address into <code>config.js</code> so everyone sees it by default, then add issuers above.</div>`;
+      $('#deployOut').innerHTML = `<div class="banner ok">✅ Registry created at <b class="mono">${contractAddress}</b><br>
+        Link: <a href="${share}">${esc(share)}</a></div>`;
       history.replaceState(null, '', '?contract=' + contractAddress);
       refreshContractUI(); refreshAdmin(); updateWalletInfo();
     } catch (e) { $('#deployOut').innerHTML = `<div class="banner bad">${esc(friendlyError(e))}</div>`; }
-    finally { btn.disabled = false; btn.textContent = ethers.isAddress(contractAddress) ? 'Deploy a new (separate) contract' : old; }
+    finally { btn.disabled = false; btn.textContent = ethers.isAddress(contractAddress) ? 'Create a new (separate) registry' : old; }
   });
 
   // ---------- start ----------

@@ -25,7 +25,7 @@
 
 <main>
   <div id="noContract" class="banner warn hidden">
-    No contract connected yet. Go to the <b>Admin</b> tab and press <b>Deploy contract</b>, or open this page with <code>?contract=0x…</code>.
+    This site is not connected to a certificate registry right now. Please try again later.
   </div>
 
   <!-- ============ VERIFY (public, no wallet) ============ -->
@@ -83,9 +83,10 @@
       </form>
     </div>
 
-    <div class="card">
-      <label class="check"><input type="checkbox" id="forceSend"> Demo mode: send the transaction even if the contract will refuse it (records a <b>failed</b> transaction on Basescan as proof). Costs a tiny bit of test ETH.</label>
-    </div>
+    <details class="card">
+      <summary class="small muted">Advanced</summary>
+      <label class="check" style="margin-top:10px"><input type="checkbox" id="forceSend"> Submit even if the contract is expected to refuse. The refused transaction is recorded on Basescan and uses a small network fee.</label>
+    </details>
   </section>
 
   <!-- ============ ADMIN ============ -->
@@ -123,26 +124,25 @@
       <div id="issuerList" class="muted">—</div>
     </div>
 
-    <div class="card" id="deployCard">
-      <h3>Deploy contract</h3>
-      <p class="muted small">Deploys <code>CertificateRegistry</code> to Base Sepolia from your MetaMask wallet. The wallet that deploys becomes the <b>admin</b>. Needs a little Base Sepolia test ETH (<a id="faucetLink" target="_blank" rel="noopener">faucet</a>).</p>
+    <div class="card hidden" id="deployCard">
+      <h3>Set up a new registry</h3>
+      <p class="muted small">Creates a new <code>CertificateRegistry</code> on Base Sepolia from your MetaMask wallet. That wallet becomes the <b>admin</b>.</p>
       <button id="deployBtn" class="primary">Deploy contract</button>
       <div id="deployOut"></div>
     </div>
   </section>
 
   <!-- transaction log -->
-  <section class="card" id="txCard">
-    <h3>Your transactions (this browser)</h3>
-    <p class="muted small">Copy these hashes for the submission form.</p>
-    <div id="txLog" class="muted small">None yet.</div>
+  <section class="card hidden" id="txCard">
+    <h3>Recent transactions</h3>
+    <div id="txLog" class="muted small"></div>
   </section>
 </main>
 
 <div id="toast" class="toast hidden"></div>
 
 <footer>
-  Contract: <span id="contractLabel">—</span> · Fake data only (IDs like S-001) · HASH-IT-OUT 2026, Track 1 · by Rakshit Sanghi
+  CertChain · Base Sepolia testnet · demo data only · Contract <span id="contractLabel">—</span>
 </footer>
 
 <script src="vendor/ethers.umd.min.js"></script>
