@@ -3,8 +3,8 @@
 **HASH-IT-OUT 2026, Track 1 (Digital Identity): Blockchain-Based Certificate Verification System**
 Built by **Rakshit Sanghi** (solo): contract, frontend, deployment.
 
-> **Live demo:** `https://raloith.github.io/hashitout-certificate-registry/` (GitHub Pages)
-> **Contract (Base Sepolia):** `0x…` ← paste after deploying
+> **Live demo:** `https://raloith.github.io/Hashitout-Certificate-Registry/?contract=0x7de80312BcDd9FBA204B0C95eb751Fbb8D8001f5` (GitHub Pages)
+> **Contract (Base Sepolia):** `0x7de80312BcDd9FBA204B0C95eb751Fbb8D8001f5` ← paste after deploying
 > **Network:** Base Sepolia testnet (chain ID 84532). **Fake data only** (holder IDs like `S-001`).
 
 ---
