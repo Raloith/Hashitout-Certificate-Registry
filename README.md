@@ -19,6 +19,13 @@ Try it: open the live app, type **C-1042** and press **Verify**. The result is *
 
 ---
 
+## Features
+
+* **Verify in two ways, with no wallet:** scan the QR code on a certificate, or type the certificate code (e.g. C-1042). The result is read live from the contract.
+* **Scan-to-verify QR certificates:** after a successful check, the site shows a certificate with a QR code that links to `…/?code=C-1042`. You can print it or save it as a PDF from the browser, or download just the QR as a PNG.
+* **Downloadable PDF certificate:** an A4 landscape design on the background artwork. It shows the on-chain title, a recipient name (typed in and printed only, **never stored on chain**; defaults to the holder ID), three signature lines and the QR code. A revoked certificate gets a **REVOKED** watermark.
+* **Issuer and admin desks:** issue, correct and revoke certificates, and manage issuer wallets with MetaMask. Refusals from the contract are shown as friendly messages.
+
 ## What it is
 
 A BPDC club or department issues a certificate for an event or workshop, for example
@@ -98,6 +105,8 @@ contracts/CertificateRegistry.sol   the smart contract
 compile.js                          compiles it with solc → artifacts/ + docs/contract-artifact.js
 test/test.js                        local tests (every refusal)
 docs/                               the website (served by GitHub Pages)
+docs/vendor/                        ethers.js, qrcode-generator (QR codes), jsPDF (PDF export), all bundled locally
+docs/assets/certificate-bg.png      background artwork for the PDF certificate
 NOTE.md                             one-page note
 EXPLAIN.md                          line-by-line contract walkthrough
 DEMO.md                             demo script and Q&A

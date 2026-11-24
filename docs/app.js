@@ -82,6 +82,7 @@
   async function verify(codeRaw) {
     const out = $('#verifyResult');
     const code = normCode(codeRaw);
+    $('#certArea').innerHTML = ''; // no certificate until the chain confirms one
     if (!code) return;
     if (!ethers.isAddress(contractAddress)) { out.innerHTML = `<div class="banner warn">This site is not connected to a certificate registry right now.</div>`; return; }
     out.innerHTML = `<div class="card muted">Checking <b>${esc(code)}</b> on the blockchain…</div>`;
@@ -126,6 +127,8 @@
           </ol>
           <p class="small muted">Read live from contract ${addrLink(contractAddress)} on ${esc(CFG.CHAIN_NAME)}.</p>
         </div>`;
+      renderCertificate({ code, holderId: last.holderId, title: last.title, issuerName: issuerNameStr || 'Unnamed issuer',
+        issuedAt: first.timestamp, revoked: st === 2, revokeReason: last.note });
     } catch (e) {
       out.innerHTML = `<div class="banner bad">${esc(friendlyError(e))}</div>`;
     }
@@ -136,6 +139,165 @@
     const u = new URL(location.href); u.searchParams.set('code', code); history.replaceState(null, '', u);
     verify(code);
   });
+
+  // ---------- QR CERTIFICATE ----------
+  // The QR is just a link to this page with ?code=...; the page then reads the blockchain.
+  function verifyLink(code) {
+    const u = new URL(location.origin + location.pathname);
+    u.searchParams.set('code', code);
+    if (contractAddress && contractAddress.toLowerCase() !== String(CFG.CONTRACT_ADDRESS || '').toLowerCase()) u.searchParams.set('contract', contractAddress);
+    return u.toString();
+  }
+  // Draws the QR onto a canvas (crisp, white margin) and returns it.
+  function qrCanvas(text, px = 8) {
+    const qr = qrcode(0, 'M'); qr.addData(text); qr.make();
+    const n = qr.getModuleCount(), margin = 4, size = (n + margin * 2) * px;
+    const cv = document.createElement('canvas'); cv.width = cv.height = size;
+    const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, size, size); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) g.fillRect((c + margin) * px, (r + margin) * px, px, px);
+    return cv;
+  }
+  let currentCert = null;
+  function certHTML(cert, qrSrc) {
+    const date = new Date(Number(cert.issuedAt) * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+    return `<div class="cert ${cert.revoked ? 'revoked' : ''}">
+      ${cert.revoked ? '<div class="c-watermark"><span>REVOKED</span></div>' : ''}
+      <div class="c-org">${esc(cert.issuerName)}</div>
+      <div class="c-head">Certificate</div>
+      <p class="c-sub">This certifies that the holder</p>
+      <div class="c-holder">${esc(cert.holderId)}</div>
+      <p class="c-sub">has been awarded</p>
+      <div class="c-title">${esc(cert.title)}</div>
+      <div class="c-grid">
+        <dl>
+          <dt>Certificate code</dt><dd>${esc(cert.code)}</dd>
+          <dt>Issued by</dt><dd>${esc(cert.issuerName)}</dd>
+          <dt>Issue date</dt><dd>${esc(date)}</dd>
+          <dt>Registry</dt><dd>${short(contractAddress)}</dd>
+          ${cert.revoked ? `<dt>Status</dt><dd style="color:#c62f3a">Revoked${cert.revokeReason ? ' – ' + esc(cert.revokeReason) : ''}</dd>` : ''}
+        </dl>
+        <div class="c-qr"><img src="${qrSrc}" alt="QR code to verify certificate ${esc(cert.code)}">Scan to verify</div>
+      </div>
+      <div class="c-badge">${cert.revoked ? '⛔ Revoked on Base Sepolia' : '✔ Verified on Base Sepolia'}</div>
+    </div>`;
+  }
+  function renderCertificate(cert) {
+    currentCert = cert;
+    const link = verifyLink(cert.code);
+    const qrSrc = qrCanvas(link, 8).toDataURL('image/png');
+    $('#certArea').innerHTML = `<div class="card" id="certCard">
+      <h3>Certificate</h3>
+      ${certHTML(cert, qrSrc)}
+      <div class="certActions">
+        <button class="primary" id="printCert">🖨️ Print / Download certificate</button>
+        <button id="downloadQr">⬇️ Download QR (PNG)</button>
+      </div>
+      <div class="pdfBox">
+        <h3>Download certificate (PDF)</h3>
+        <div class="row">
+          <label>Recipient name <small>(printed only, not stored on chain)</small>
+            <input id="pdfName" placeholder="${esc(cert.holderId)}" autocomplete="off" maxlength="60"></label>
+          <button class="primary" id="downloadPdf">📄 Download certificate (PDF)</button>
+        </div>
+      </div>
+      <p class="small muted">QR link: <a href="${esc(link)}" class="mono">${esc(link)}</a></p>
+    </div>`;
+    $('#printArea').innerHTML = certHTML(cert, qrSrc);
+    $('#printCert').addEventListener('click', () => window.print());
+    $('#downloadPdf').addEventListener('click', async ev => {
+      const btn = ev.currentTarget; btn.disabled = true; const old = btn.textContent; btn.textContent = 'Preparing PDF…';
+      try { await downloadPdf(cert, link, $('#pdfName').value.trim() || cert.holderId); }
+      catch (e) { toast('Could not create the PDF: ' + (e.message || e)); }
+      finally { btn.disabled = false; btn.textContent = old; }
+    });
+    $('#downloadQr').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = qrCanvas(link, 16).toDataURL('image/png');
+      a.download = `certificate-${cert.code}-qr.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+    });
+  }
+
+  // ---------- PDF CERTIFICATE ----------
+  // Draws the certificate on a canvas (A4 landscape, 150 dpi) over the background artwork,
+  // then places that image on a one-page PDF with jsPDF.
+  const loadImage = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('background image failed to load')); i.src = src; });
+  function wrapLines(g, text, maxW) {
+    const words = text.split(' '); const lines = []; let line = '';
+    for (const w of words) { const t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
+    if (line) lines.push(line); return lines;
+  }
+  function fitFont(g, text, weight, size, family, maxW) {
+    do { g.font = `${weight} ${size}px ${family}`; size -= 2; } while (g.measureText(text).width > maxW && size > 20);
+  }
+  async function drawCertificateCanvas(cert, link, recipient) {
+    const W = 1754, H = 1240; // A4 landscape @150dpi
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    // background: cover-fit the artwork, then darken it so white text stays readable
+    const bg = await loadImage('assets/certificate-bg.png');
+    const s = Math.max(W / bg.width, H / bg.height), bw = bg.width * s, bh = bg.height * s;
+    g.drawImage(bg, (W - bw) / 2, (H - bh) / 2, bw, bh);
+    g.fillStyle = 'rgba(4, 10, 40, 0.55)'; g.fillRect(0, 0, W, H);
+    const grad = g.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, W * 0.6);
+    grad.addColorStop(0, 'rgba(4,10,40,0.35)'); grad.addColorStop(1, 'rgba(4,10,40,0)');
+    g.fillStyle = grad; g.fillRect(0, 0, W, H);
+    // frame
+    g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 4; g.strokeRect(40, 40, W - 80, H - 80);
+    g.strokeStyle = 'rgba(160,190,255,0.6)'; g.lineWidth = 2; g.strokeRect(56, 56, W - 112, H - 112);
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    g.shadowColor = 'rgba(0,0,0,0.6)'; g.shadowBlur = 12;
+    const serif = 'Georgia, "Times New Roman", serif', sans = 'system-ui, "Segoe UI", Roboto, Arial, sans-serif';
+    // small header
+    g.fillStyle = '#bcd0ff'; g.font = `600 30px ${sans}`;
+    g.fillText(('Certificate · ' + cert.issuerName).toUpperCase(), W / 2, 150);
+    // title (on-chain), large
+    g.fillStyle = '#ffffff'; fitFont(g, cert.title, 700, 78, serif, W - 260);
+    g.fillText(cert.title, W / 2, 265);
+    g.fillStyle = 'rgba(255,255,255,0.7)'; g.fillRect(W / 2 - 160, 300, 320, 3);
+    // "presented to" + recipient
+    g.fillStyle = '#d6e2ff'; g.font = `italic 36px ${serif}`;
+    g.fillText('This certificate is presented to', W / 2, 410);
+    g.fillStyle = '#ffffff'; fitFont(g, recipient, 700, 104, serif, W - 360);
+    g.fillText(recipient, W / 2, 545);
+    // description
+    const date = new Date(Number(cert.issuedAt) * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    const desc = `has successfully been awarded this certificate by ${cert.issuerName} on ${date}. Certificate code ${cert.code} · Holder ID ${cert.holderId}.`;
+    g.fillStyle = '#e4ecff'; g.font = `32px ${sans}`;
+    wrapLines(g, desc, 1150).forEach((l, i) => g.fillText(l, W / 2, 635 + i * 46));
+    g.fillStyle = cert.revoked ? '#ff9aa2' : '#9ef0c8'; g.font = `600 26px ${sans}`;
+    g.fillText(cert.revoked ? '⛔ Revoked on Base Sepolia' : '✔ Verified on Base Sepolia · registry ' + short(contractAddress), W / 2, 790);
+    // three signature spots
+    const sigY = 1010, sigW = 340, cols = [W * 0.2, W * 0.5, W * 0.8 - 90];
+    ['Club President', 'Faculty In-charge', 'Student Affairs'].forEach((label, i) => {
+      g.shadowBlur = 0; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(cols[i] - sigW / 2, sigY); g.lineTo(cols[i] + sigW / 2, sigY); g.stroke();
+      g.shadowBlur = 8; g.fillStyle = '#ffffff'; g.font = `600 28px ${sans}`; g.fillText(label, cols[i], sigY + 42);
+    });
+    // QR, bottom-right
+    g.shadowBlur = 0;
+    const qr = qrCanvas(link, 6), qs = 170, qx = W - 80 - qs, qy = H - 100 - qs;
+    g.fillStyle = '#fff'; g.fillRect(qx - 6, qy - 6, qs + 12, qs + 12);
+    g.imageSmoothingEnabled = false; g.drawImage(qr, qx, qy, qs, qs); g.imageSmoothingEnabled = true;
+    g.fillStyle = '#ffffff'; g.font = `500 20px ${sans}`; g.fillText('Scan to verify', qx + qs / 2, qy + qs + 32);
+    // revoked watermark
+    if (cert.revoked) {
+      g.save(); g.translate(W / 2, H / 2); g.rotate(-0.38);
+      g.fillStyle = 'rgba(255,60,80,0.38)'; g.strokeStyle = 'rgba(255,60,80,0.6)'; g.lineWidth = 12;
+      g.font = `900 260px ${sans}`; g.textBaseline = 'middle';
+      g.fillText('REVOKED', 0, 0); g.strokeRect(-720, -170, 1440, 340); g.restore();
+    }
+    return cv;
+  }
+  async function downloadPdf(cert, link, recipient) {
+    const cv = await drawCertificateCanvas(cert, link, recipient);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    pdf.setProperties({ title: `Certificate ${cert.code}`, subject: `${cert.title} — verify at ${link}`, creator: 'CertChain' });
+    pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 297, 210);
+    pdf.link(297 - 80 / 1754 * 297 - 170 / 1754 * 297, 210 - (100 + 170) / 1240 * 210, 170 / 1754 * 297, 170 / 1240 * 210, { url: link });
+    pdf.save(`certificate-${cert.code}.pdf`);
+  }
 
   // ---------- WALLET ----------
   const hexChain = '0x' + CHAIN_ID.toString(16);
@@ -313,6 +475,11 @@
 
   // ---------- start ----------
   refreshContractUI(); renderTxLog(); refreshAdmin();
-  if (params.get('code')) { $('#verifyCode').value = params.get('code'); verify(params.get('code')); }
-  if (params.get('tab')) $(`.tab[data-tab=${params.get('tab')}]`)?.click();
+  // Deep link (what the QR code opens): ?code=C-1042 -> Verify tab + automatic check.
+  const linkCode = normCode(params.get('code') || params.get('c') || new URLSearchParams(location.hash.slice(1)).get('code'));
+  if (linkCode) {
+    $('.tab[data-tab=verify]').click();
+    $('#verifyCode').value = linkCode;
+    verify(linkCode);
+  } else if (params.get('tab')) $(`.tab[data-tab=${params.get('tab')}]`)?.click();
 })();

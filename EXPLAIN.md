@@ -185,3 +185,23 @@ function issuerCount() external view returns (uint256)
 When MetaMask or ethers prepares a transaction, it first simulates it (gas estimation). If a `require` fails, the node returns the
 message, and `friendlyError()` in `app.js` turns it into "Refused by the contract: …". With **Demo mode** ticked, the page skips that
 simulation by setting a fixed gas limit. The transaction is then mined and **fails on-chain**, which leaves public proof on Basescan.
+
+## How the QR code works (plain English)
+
+* **The QR code is just a link.** It contains the site address plus the certificate code, for example
+  `https://raloith.github.io/Hashitout-Certificate-Registry/?code=C-1042`. It holds no signature, no secret and no certificate data.
+* **Scanning it opens the Verify page.** The page reads `?code=C-1042` from the address, switches to the Verify tab and runs exactly
+  the same check as typing the code by hand. It asks the contract on Base Sepolia for that code's versions and shows Valid,
+  Valid (corrected), Revoked or Not found.
+* **The QR itself isn't trusted. The blockchain is.** Someone could print a fake certificate with a real-looking QR, but the QR can only point
+  to a code. If that code was never issued by an approved issuer, or was revoked, the page says so, because the answer comes from the chain,
+  not from the paper. A QR pointing to a different website would show up as a different web address when scanned.
+* **Typing the code still works.** The QR is a shortcut for the same check.
+* **Where the QR comes from:** `docs/vendor/qrcode.js` (the open-source qrcode-generator library) turns the link into black and white squares,
+  and `app.js` draws them on a canvas. **Download QR (PNG)** saves that canvas as an image.
+* **Printing and PDF:**
+  * **Print / Download certificate** uses the browser's print dialog, and the print styles show only the certificate. Choose "Save as PDF" to keep it.
+  * **Download certificate (PDF)** draws the certificate on a canvas over the background artwork, then jsPDF (`docs/vendor/jspdf.umd.min.js`) puts it on an A4 landscape page.
+* **The recipient name is printed only.** The optional name box is used only for the PDF in your browser. It's never sent to the blockchain, because
+  public chains can't erase data and the rules say no personal data on-chain. If it's left empty, the holder ID (e.g. S-001) is printed.
+* **Revoked certificates** get a large REVOKED watermark on both the printable view and the PDF.

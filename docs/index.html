@@ -32,13 +32,18 @@
   <section id="tab-verify" class="panel">
     <div class="card">
       <h2>Verify a certificate</h2>
-      <p class="muted">Type the certificate code printed on the certificate (for example <b>C-1042</b>). No wallet or login needed.</p>
+      <p class="muted">Two ways to check, no wallet or login needed:</p>
+      <ol class="methods">
+        <li><b>Scan the QR code</b> on the certificate with your phone camera. It opens this page and checks the certificate automatically.</li>
+        <li><b>Or type the certificate code</b> printed on the certificate (for example <b>C-1042</b>) and press Verify.</li>
+      </ol>
       <form id="verifyForm" class="row">
         <input id="verifyCode" placeholder="Certificate code, e.g. C-1042" autocomplete="off" autocapitalize="characters" required>
         <button class="primary" type="submit">Verify</button>
       </form>
     </div>
     <div id="verifyResult"></div>
+    <div id="certArea"></div>
   </section>
 
   <!-- ============ ISSUER ============ -->
@@ -140,12 +145,15 @@
 </main>
 
 <div id="toast" class="toast hidden"></div>
+<div id="printArea" aria-hidden="true"></div>
 
 <footer>
   CertChain · Base Sepolia testnet · demo data only · Contract <span id="contractLabel">—</span>
 </footer>
 
 <script src="vendor/ethers.umd.min.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
 <script src="config.js"></script>
 <script src="contract-artifact.js"></script>
 <script src="app.js"></script>
